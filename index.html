@@ -604,8 +604,8 @@
 
         <h4 class="no-print" id="searchHeaderTitle" style="display:none;">Examination Result Search</h4>
         
-        <!-- Main Search Bar -->
-        <div class="input-group no-print" id="originalSearchGroup" style="display: flex;">
+        <!-- Main Search Bar (Hidden by default as requested) -->
+        <div class="input-group no-print" id="originalSearchGroup" style="display: none;">
             <select id="classSelect">
                 <option value="" disabled selected>Select your class</option>
                 <option value="ten">Class 10</option>
@@ -983,13 +983,13 @@
                             <option value="Art and Culture (শিল্প ও সংস্কৃতি)">Art and Culture (শিল্প ও সংস্কৃতি)</option>
                             <option value="Wellbeing (স্বাস্থ্য সুরক্ষা)">Wellbeing (স্বাস্থ্য সুরক্ষা)</option>
                             <option value="Islamic Education (ইসলাম শিক্ষা)">Islamic Education (ইসলাম শিক্ষা)</option>
-                            <option value="Hindu Education (हिंदुধর্ম শিক্ষা)">Hindu Education (হিন্দুধর্ম শিক্ষা)</option>
+                            <option value="Hindu Education (हिंदुধর্ম শিক্ষা)">Hindu Education (हिंदुधर्म शिक्षा)</option>
                             <option value="Accounting (হিসাববিজ্ঞান)">Accounting (হিসাববিজ্ঞান)</option>
                             <option value="Finance & Banking (ফিন্যান্স ও ব্যাংকিং)">Finance & Banking (ফিন্যান্স ও ব্যাংকিং)</option>
                             <option value="Business Entrepreneurship (ব্যবসায় উদ্যোগ)">Business Entrepreneurship (ব্যবসায় উদ্যোগ)</option>
                             <option value="Geography & Environment (ভূগোল ও পরিবেশ)">Geography & Environment (ভূগোল ও পরিবেশ)</option>
                             <option value="Agriculture Studies (কৃষি শিক্ষা)">Agriculture Studies (কৃষি শিক্ষা)</option>
-                            <option value="Other">অন্যান্য বিষয়...</option>
+                            <option value="Other">Other Subjects...</option>
                         </select>
                     </div>
 
@@ -1059,7 +1059,8 @@
         { id: "m_notice", titleBn: "নোটিশবোর্ড লগ", titleEn: "Notice Log", icon: "notice", color: "linear-gradient(135deg, #2bcbba, #0fb9b1)", action: "openNoticeBoardModal()", subButtons: [] },
         { id: "m_rep", titleBn: "এডমিন রিপোর্ট প্যানেল", titleEn: "Unified Reports", icon: "reports", color: "linear-gradient(135deg, #778ca3, #4b6584)", action: "openMasterAdminPortalWithTab('unified_reports')", subButtons: [] },
         { id: "m_leave", titleBn: "হাজিরা ও ছুটি আবেদন", titleEn: "Attendance & Leave", icon: "calendar", color: "linear-gradient(135deg, #ff4757, #ff6b81)", action: "openAttendanceLeavePortal()", subButtons: [] },
-        { id: "m_routine", titleBn: "ক্লাস রুটিন", titleEn: "Class Routine", icon: "calendar", color: "linear-gradient(135deg, #1e3c72, #2a5298)", actionType: "html", action: "renderCustomHTMLModule('m_routine')", customHtml: classRoutineHTML, subButtons: [] }
+        { id: "m_routine", titleBn: "ক্লাস রুটিন", titleEn: "Class Routine", icon: "calendar", color: "linear-gradient(135deg, #1e3c72, #2a5298)", actionType: "html", action: "renderCustomHTMLModule('m_routine')", customHtml: classRoutineHTML, subButtons: [] },
+        { id: "m_security", titleBn: "পাসওয়ার্ড ও সুরক্ষা", titleEn: "Password & Security", icon: "user", color: "linear-gradient(135deg, #2a5298, #1e3c72)", action: "openPasswordSecurityPortal()", subButtons: [] }
     ];
     portalModules = defaultPortalModules;
 
@@ -1105,8 +1106,12 @@
 
             const settingsDoc = await docRef("portal_settings");
             portalSettings = settingsDoc.exists ? settingsDoc.data().config : {
-                showSearchOption: true, showPrintButton: true, showStudentPhoto: true, showRank: true, showGroup: true, showTotalMarks: true, showGPA: true, showStatus: true, allowCTPrint: true
+                showSearchOption: false, showPrintButton: true, showStudentPhoto: true, showRank: true, showGroup: true, showTotalMarks: true, showGPA: true, showStatus: true, allowCTPrint: true, masterAdminPassword: "999"
             };
+            
+            if (!portalSettings.masterAdminPassword) {
+                portalSettings.masterAdminPassword = "999";
+            }
 
             const customColDoc = await docRef("custom_columns");
             customColumns = customColDoc.exists ? customColDoc.data().list : [
@@ -1142,10 +1147,15 @@
             const moduleDoc = await docRef("portal_modules");
             portalModules = moduleDoc.exists ? moduleDoc.data().list : defaultPortalModules;
 
+            // Ensure our security module exists in loaded dynamic modules
+            if (portalModules && !portalModules.some(m => m.id === "m_security")) {
+                portalModules.push({ id: "m_security", titleBn: "পাসওয়ার্ড ও সুরক্ষা", titleEn: "Password & Security", icon: "user", color: "linear-gradient(135deg, #2a5298, #1e3c72)", action: "openPasswordSecurityPortal()", subButtons: [] });
+            }
+
             const routineDoc = await docRef("custom_routine");
             localCustomRoutine = routineDoc.exists ? routineDoc.data().data : JSON.parse(JSON.stringify(defaultWeeklyRoutine));
 
-            // ডাটা লোড হওয়ার পর ইন্টারফেসের মূল কাজ সম্পন্ন করুন
+            // দিন ও সময় সমন্বয়
             syncWithGlobalState();
             calculateAllRanks();
             initLiveNoticeTicker();
@@ -3492,23 +3502,7 @@ function searchResult() {
                 </tr>
             `;
         }
-
-        document.getElementById('resRoll').innerText = student.roll;
-        document.getElementById('resName').innerText = student.name;
-        document.getElementById('resGroup').innerText = student.group;
-        document.getElementById('resRank').innerText = student.rankText || "N/A";
         
-        const resPhotoImg = document.getElementById('resPhoto');
-        const fallbackDiv = document.getElementById('photoFallback');
-        if (student.photo) {
-            resPhotoImg.src = student.photo;
-            resPhotoImg.style.display = "block";
-            fallbackDiv.style.display = "none";
-        } else {
-            resPhotoImg.style.display = "none";
-            fallbackDiv.style.display = "block";
-        }
-
         document.querySelectorAll('.meta-item-custom').forEach(el => el.remove());
         const metaParent = document.querySelector('.meta-info');
         customColumns.forEach(col => {
@@ -3999,18 +3993,25 @@ function initLiveNoticeTicker() {
 // ==========================================
 function openMasterAdminPortalWithTab(targetTab) {
     const pass = prompt("Enter Master Admin Password:");
-    if (pass !== "999") { alert("Wrong Password!"); return; }
+    const correctAdminPass = portalSettings.masterAdminPassword || "999";
+    if (pass !== correctAdminPass) { alert("Wrong Password!"); return; }
+    createModalFrame("🛠️ Master Admin Portal", "");
     renderMasterAdminFrame();
     switchAdminTab(targetTab);
 }
 
 function openMasterAdminPortal() {
     const pass = prompt("Enter Master Admin Password:");
-    if (pass !== "999") { alert("Wrong Password!"); return; }
+    const correctAdminPass = portalSettings.masterAdminPassword || "999";
+    if (pass !== correctAdminPass) { alert("Wrong Password!"); return; }
+    createModalFrame("🛠️ Master Admin Portal", "");
     renderMasterAdminFrame();
 }
 
 function renderMasterAdminFrame() {
+    const frame = document.querySelector('.bahs-modal-box');
+    if (!frame) return;
+
     const activeLeaves = leaveRequests.filter(r => r.status === 'pending_admin').length;
     const tabs = `
         <div class="bahs-modal-tabs">
@@ -4026,8 +4027,9 @@ function renderMasterAdminFrame() {
             <button class="bahs-modal-tab" onclick="switchAdminTab('income_expense')" style="background: linear-gradient(135deg, #2c3e50, #34495e); color: white;">💰 Income & Expense</button>
             <button class="bahs-modal-tab" onclick="switchAdminTab('menu_builder')" style="background: linear-gradient(135deg, #e74c3c, #c0392b); color: white;">🛠️ Menu & HTML Builder</button>
         </div>
+        <div id="modalContentTarget"></div>
     `;
-    container.innerHTML = tabs;
+    frame.querySelector('.bahs-modal-body').innerHTML = tabs;
 }
 
 function switchAdminTab(target) {
@@ -5810,9 +5812,9 @@ function renderAdminFeeScaleList() {
         summaryCard.innerHTML = `
             <div style="font-weight:bold; color:#1e3c72; margin-bottom:5px;">📊 Financial Ledger Status: ${classFilter === 'all' ? 'All Classes Combined' : 'Class ' + classFilter.toUpperCase()}</div>
             <div style="display:flex; justify-content:space-between; gap:10px;">
-                <div>Target (আদায়যোগ্য): <strong style="color:#2c3e50;">${totalAssignedAll} TK</strong></div>
-                <div>Collected (আদায়কৃত): <strong style="color:green;">${totalCollectedAll} TK</strong></div>
-                <div>Dues (মোট বকেয়া): <strong style="color:red;">${totalDuesAll} TK</strong></div>
+                <div>Target: <strong style="color:#2c3e50;">${totalAssignedAll} TK</strong></div>
+                <div>Collected: <strong style="color:green;">${totalCollectedAll} TK</strong></div>
+                <div>Dues: <strong style="color:red;">${totalDuesAll} TK</strong></div>
             </div>
         `;
     }
@@ -6745,7 +6747,8 @@ window.sortActiveRoutine = function(field) {
 
 window.unlockRoutineAdminSettings = function() {
     const pin = prompt("মাস্টার অ্যাডমিন সিকিউরিটি পাসওয়ার্ড দিন (Master Admin Password):");
-    if (pin !== "999") {
+    const correctAdminPass = portalSettings.masterAdminPassword || "999";
+    if (pin !== correctAdminPass) {
         alert("ভুল পাসওয়ার্ড! অ্যাক্সেস প্রত্যাখ্যাত করা হলো।");
         return;
     }
@@ -7069,8 +7072,8 @@ window.printCurrentRoutine = function() {
                 ${getOfficialPrintHeaderHTML(`OFFICIAL WEEKLY SCHEDULE REGISTER`, cls.toUpperCase(), "N/A")}
                 
                 <div style="text-align:left; font-size:14px; margin-bottom:15px; border-bottom:1px dashed #000; padding-bottom:8px;">
-                    শ্রেণি (Academic Class): <strong>Class ${cls.toUpperCase()}</strong> &nbsp;&nbsp;|&nbsp;&nbsp;
-                    দিন/বার (Routine Day): <strong>${day}</strong>
+                    শ্রেণি: <strong>Class ${cls.toUpperCase()}</strong> &nbsp;&nbsp;|&nbsp;&nbsp;
+                    দিন/বার: <strong>${day}</strong>
                 </div>
 
                 <table>
@@ -7106,11 +7109,262 @@ window.initClassRoutine = function() {
 }
 
 // ==========================================
+// পাসওয়ার্ড ও নিরাপত্তা পোর্টাল মেথডসমূহ (নতুন)
+// ==========================================
+function openPasswordSecurityPortal() {
+    createModalFrame("🔐 পাসওয়ার্ড ও সুরক্ষা (Password & Security)", `
+        <div style="max-width:400px; margin:0 auto; padding:20px 0; text-align:center;">
+            <p style="font-size:13px; color:#57606f; margin-bottom:20px; font-weight:600;">
+                নিরাপত্তা ও পাসওয়ার্ড ব্যবস্থাপনা প্যানেলে আপনাকে স্বাগতম।
+            </p>
+            <button class="btn btn-primary" style="width:100%; margin-bottom:12px; background:var(--primary-gradient);" onclick="openSecurityClassTeacherLogin()">👨‍🏫 শ্রেণি শিক্ষক প্রবেশদ্বার (Class Teacher)</button>
+            <button class="btn btn-primary" style="width:100%; background:var(--fail-gradient);" onclick="openSecurityMasterAdminLogin()">🛠️ মাস্টার এডমিন প্রবেশদ্বার (Master Admin)</button>
+        </div>
+    `);
+}
+
+function openSecurityClassTeacherLogin() {
+    if (classTeachers.length === 0) {
+        alert("No Class Teachers registered!"); return;
+    }
+    let selectOptions = `<option value="" disabled selected>-- Select Teacher Profile --</option>`;
+    classTeachers.forEach(ct => {
+        const profile = registeredTeachers.find(t => t.id === ct.teacherId);
+        if (profile) {
+            selectOptions += `<option value="${ct.id}">${profile.name} (Class ${ct.class.toUpperCase()})</option>`;
+        }
+    });
+
+    createModalFrame("👨‍🏫 শ্রেণি শিক্ষক নিরাপত্তা ভেরিফিকেশন", `
+        <div style="max-width:350px; margin:0 auto; padding:20px 0; text-align:left;">
+            <div class="bahs-form-group">
+                <label>Select Your Profile Name:</label>
+                <select id="secCT_id" class="bahs-form-control">${selectOptions}</select>
+            </div>
+            <div class="bahs-form-group">
+                <label>Enter Security PIN:</label>
+                <input type="password" id="secCT_pin" class="bahs-form-control">
+            </div>
+            <button class="btn btn-primary" style="width:100%;" onclick="submitSecurityCTLogin()">ভেরিফাই করুন</button>
+            <button class="btn" style="width:100%; margin-top:10px; background:#7f8c8d; color:#fff;" onclick="openPasswordSecurityPortal()">ফিরে যান</button>
+        </div>
+    `);
+}
+
+function submitSecurityCTLogin() {
+    const id = document.getElementById('secCT_id').value;
+    const pin = document.getElementById('secCT_pin').value.trim();
+    const assignment = classTeachers.find(t => t.id === id);
+    if (!assignment) { alert("Please select a profile!"); return; }
+
+    const profile = registeredTeachers.find(t => t.id === assignment.teacherId);
+    if (!profile || profile.pin !== pin) { alert("ভুল পিন নম্বর!"); return; }
+
+    renderSecurityCTDashboard(assignment, profile);
+}
+
+function renderSecurityCTDashboard(assignment, profile) {
+    const frame = document.querySelector('.bahs-modal-box');
+    if (!frame) return;
+
+    frame.querySelector('.bahs-modal-header h3').innerText = `🔐 পাসওয়ার্ড পরিবর্তন খাতা (Class ${assignment.class.toUpperCase()})`;
+    
+    const students = studentDB.filter(s => s.class === assignment.class);
+    students.sort((a,b) => a.roll - b.roll);
+
+    let rowsHTML = "";
+    if (students.length === 0) {
+        rowsHTML = `<tr><td colspan="4" style="padding:15px; color:#7f8c8d;">কোনো শিক্ষার্থী পাওয়া যায়নি।</td></tr>`;
+    } else {
+        students.forEach(s => {
+            rowsHTML += `
+                <tr>
+                    <td><strong>${s.roll}</strong></td>
+                    <td style="text-align:left;"><strong>${s.name}</strong></td>
+                    <td><code style="font-size:14px; color:#e74c3c; font-weight:bold;">${s.password || '1234'}</code></td>
+                    <td>
+                        <div style="display:flex; gap:5px; justify-content:center;">
+                            <input type="text" id="sec_std_pass_${s.roll}" class="bahs-form-control" style="width:100px; padding:4px 8px; font-size:13px;" placeholder="নতুন পিন">
+                            <button class="btn btn-primary" style="padding:4px 10px; font-size:12px; box-shadow:none; margin:0;" onclick="changeStudentPasswordByCT('${assignment.class}', ${s.roll})">সেট করুন</button>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    frame.querySelector('.bahs-modal-body').innerHTML = `
+        <div style="text-align:left;">
+            <div style="background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #cbd5e1; margin-bottom:15px;">
+                শ্রেণি শিক্ষক: <strong>${profile.name}</strong> &nbsp;|&nbsp; শ্রেণি: <strong>Class ${assignment.class.toUpperCase()}</strong>
+            </div>
+            <div class="table-responsive">
+                <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:center;" border="1">
+                    <thead>
+                        <tr style="background:#1e3c72; color:#fff;">
+                            <th>রোল</th>
+                            <th style="text-align:left;">শিক্ষার্থীর নাম</th>
+                            <th>বর্তমান পাসওয়ার্ড (PIN)</th>
+                            <th>নতুন পাসওয়ার্ড সেট করুন</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHTML}
+                    </tbody>
+                </table>
+            </div>
+            <div style="text-align:right; margin-top:15px;">
+                <button class="btn" style="background:#7f8c8d; color:white;" onclick="openPasswordSecurityPortal()">ফিরে যান</button>
+            </div>
+        </div>
+    `;
+}
+
+function changeStudentPasswordByCT(cls, roll) {
+    const inputVal = document.getElementById(`sec_std_pass_${roll}`).value.trim();
+    if (!inputVal) { alert("পাসওয়ার্ড খালি রাখা যাবে না!"); return; }
+
+    const student = studentDB.find(s => s.class === cls && s.roll === roll);
+    if (student) {
+        student.password = inputVal;
+        saveCoreData();
+        showNotice(`রোল ${roll}-এর পাসওয়ার্ড পরিবর্তন সফল হয়েছে!`, "success");
+        const ctAssignment = window.currentLoggedInCT || classTeachers.find(ct => ct.class === cls);
+        if (ctAssignment) {
+            const profile = registeredTeachers.find(t => t.id === ctAssignment.teacherId);
+            renderSecurityCTDashboard(ctAssignment, profile);
+        }
+    }
+}
+
+function openSecurityMasterAdminLogin() {
+    createModalFrame("🛠️ মাস্টার এডমিন নিরাপত্তা ভেরিফিকেশন", `
+        <div style="max-width:350px; margin:0 auto; padding:20px 0; text-align:left;">
+            <div class="bahs-form-group">
+                <label>Enter Master Admin Password:</label>
+                <input type="password" id="secAdmin_pin" class="bahs-form-control">
+            </div>
+            <div style="text-align:right; margin-bottom:15px;">
+                <a href="javascript:void(0)" onclick="triggerMasterAdminPasswordRecovery()" style="color:#e74c3c; font-size:12px; font-weight:bold; text-decoration:none;">পাসওয়ার্ড ভুলে গেছেন? (Forgot Password)</a>
+            </div>
+            <button class="btn btn-primary" style="width:100%;" onclick="submitSecurityAdminLogin()">ভেরিফাই করুন</button>
+            <button class="btn" style="width:100%; margin-top:10px; background:#7f8c8d; color:#fff;" onclick="openPasswordSecurityPortal()">ফিরে যান</button>
+        </div>
+    `);
+}
+
+function submitSecurityAdminLogin() {
+    const pin = document.getElementById('secAdmin_pin').value.trim();
+    const correctPass = portalSettings.masterAdminPassword || "999";
+    if (pin !== correctPass) { alert("ভুল মাস্টার পাসওয়ার্ড!"); return; }
+    renderSecurityAdminDashboard();
+}
+
+function renderSecurityAdminDashboard() {
+    const frame = document.querySelector('.bahs-modal-box');
+    if (!frame) return;
+
+    frame.querySelector('.bahs-modal-header h3').innerText = `🛠️ শিক্ষক পাসওয়ার্ড ও সুরক্ষা (Master Admin)`;
+
+    let rowsHTML = "";
+    registeredTeachers.sort((a,b) => a.seniority - b.seniority).forEach((t, idx) => {
+        rowsHTML += `
+            <tr>
+                <td style="padding:6px; font-weight:bold;">${idx + 1}</td>
+                <td style="text-align:left;"><strong>${t.name}</strong><br><small style="color:#7f8c8d;">${t.designation}</small></td>
+                <td><code style="font-size:14px; color:#e74c3c; font-weight:bold;">${t.pin}</code></td>
+                <td>
+                    <div style="display:flex; gap:5px; justify-content:center;">
+                        <input type="text" id="sec_teacher_pin_${t.id}" class="bahs-form-control" style="width:100px; padding:4px 8px; font-size:13px;" placeholder="নতুন পিন">
+                        <button class="btn btn-primary" style="padding:4px 10px; font-size:12px; box-shadow:none; margin:0;" onclick="changeTeacherPasswordByAdmin('${t.id}')">সেট করুন</button>
+                    </div>
+                </td>
+            </tr>
+        `;
+    });
+
+    frame.querySelector('.bahs-modal-body').innerHTML = `
+        <div style="text-align:left;">
+            <div style="background:#f8fafc; padding:15px; border-radius:8px; border:1px solid #cbd5e1; margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                <div>মাস্টার এডমিন প্যানেল</div>
+                <div>
+                    <button class="btn" style="background:#e74c3c; color:white; padding:5px 12px; font-size:11px; box-shadow:none; margin:0;" onclick="changeMasterAdminPasswordPrompt()">মাস্টার পাসওয়ার্ড পরিবর্তন করুন</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table style="width:100%; border-collapse:collapse; font-size:12px; text-align:center;" border="1">
+                    <thead>
+                        <tr style="background:#2c3e50; color:#fff;">
+                            <th>ক্রমিক</th>
+                            <th style="text-align:left;">শিক্ষকের নাম ও পদবী</th>
+                            <th>বর্তমান পাসওয়ার্ড (PIN)</th>
+                            <th>নতুন পাসওয়ার্ড সেট করুন</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rowsHTML}
+                    </tbody>
+                </table>
+            </div>
+            <div style="text-align:right; margin-top:15px;">
+                <button class="btn" style="background:#7f8c8d; color:white;" onclick="openPasswordSecurityPortal()">ফিরে যান</button>
+            </div>
+        </div>
+    `;
+}
+
+function changeTeacherPasswordByAdmin(tId) {
+    const inputVal = document.getElementById(`sec_teacher_pin_${tId}`).value.trim();
+    if (!inputVal) { alert("পিন নম্বর খালি রাখা যাবে না!"); return; }
+
+    const teacher = registeredTeachers.find(t => t.id === tId);
+    if (teacher) {
+        teacher.pin = inputVal;
+        saveCoreData();
+        showNotice(`${teacher.name}-এর পিন কোড সফলভাবে পরিবর্তন হয়েছে!`, "success");
+        renderSecurityAdminDashboard();
+    }
+}
+
+function changeMasterAdminPasswordPrompt() {
+    const newPass = prompt("নতুন মাস্টার এডমিন পাসওয়ার্ড লিখুন:", portalSettings.masterAdminPassword || "999");
+    if (newPass && newPass.trim() !== "") {
+        portalSettings.masterAdminPassword = newPass.trim();
+        saveCoreData();
+        showNotice("মাস্টার এডমিন পাসওয়ার্ড সফলভাবে আপডেট করা হয়েছে!", "success");
+        renderSecurityAdminDashboard();
+    }
+}
+
+function triggerMasterAdminPasswordRecovery() {
+    const simulatedPIN = Math.floor(100000 + Math.random() * 900000); 
+    alert("একটি ভেরিফিকেশন পিন কোড bahschool111741@gmail.com ঠিকানায় পাঠানো হয়েছে।\n\n(পরীক্ষামূলক ব্যবহারের জন্য পিন কোডটি হলো: " + simulatedPIN + ")");
+    
+    const userEnteredPIN = prompt("ইমেইল থেকে পাওয়া ৬ ডিজিটের পিন কোডটি দিন:");
+    if (userEnteredPIN && parseInt(userEnteredPIN) === simulatedPIN) {
+        const newPass = prompt("অভিনন্দন! পিন কোড মিলেছে। নতুন মাস্টার এডমিন পাসওয়ার্ড লিখুন:");
+        if (newPass && newPass.trim() !== "") {
+            portalSettings.masterAdminPassword = newPass.trim();
+            saveCoreData();
+            alert("আপনার মাস্টার এডমিন পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে। নতুন পাসওয়ার্ড দিয়ে লগইন করুন।");
+            openSecurityMasterAdminLogin();
+        } else {
+            alert("পাসওয়ার্ড খালি রাখা যাবে না!");
+        }
+    } else {
+        alert("ভুল পিন কোড প্রদান করা হয়েছে!");
+    }
+}
+
+// ==========================================
 // DOM Load এবং ইনিশিয়ালাইজেশন ইভেন্ট বাইন্ডিং
 // ==========================================
 window.addEventListener('DOMContentLoaded', async () => {
     // ডাটাবেজ থেকে ডাটা লোড না হওয়া পর্যন্ত অপেক্ষা করুন
     await loadDataFromFirebase();
+
+    // স্বাগতম নোটিফিকেশন টোস্ট
+    showNotice("Welcome to Baghaitala Adarsha High School Academic Portal!", "success");
 
     if (localStorage.getItem('bahs_result_published') === null) {
         localStorage.setItem('bahs_result_published', 'true');
